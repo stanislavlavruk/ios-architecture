@@ -17,7 +17,6 @@ protocol SearchDriving {
     var didSelect: Driver<SearchResultItem> { get }
     
     func search(_ query: String)
-    func selectCategory(_ category: SearchResultItemType)
     func select(_ model: SearchResultItem)
 }
 
@@ -29,7 +28,6 @@ final class SearchDriver: SearchDriving {
     private let didSelectRelay = BehaviorRelay<SearchResultItem?>(value: nil)
     
     private var searchBag = DisposeBag()
-    private var selectedCategory: SearchResultItemType = .movies
 
     private let api: TMDBApiProvider
     
@@ -54,19 +52,17 @@ final class SearchDriver: SearchDriving {
             return
         }
 
-        let searchResult: Observable<[SearchResultItem]>
-        
-        switch selectedCategory {
-        case .movies:
-            searchResult = api.searchMovies(forQuery: query)
-                .map({ $0 ?? [] })
-                .mapMany(SearchResultItem.init)
+        let searchResult = Observable.merge([
+            api.searchMovies(forQuery: query)
+            .map({ $0 ?? [] })
+            .distinctUntilChanged()
+            .mapMany(SearchResultItem.init),
             
-        case .people:
-            searchResult = api.searchPeople(forQuery: query)
-                .map({ $0 ?? [] })
-                .mapMany(SearchResultItem.init)
-        }
+            api.searchPeople(forQuery: query)
+            .map({ $0 ?? [] })
+            .distinctUntilChanged()
+            .mapMany(SearchResultItem.init)
+        ])
         
         searchResult
             .trackActivity(activityIndicator)
@@ -74,11 +70,7 @@ final class SearchDriver: SearchDriving {
             .bind(onNext: resultsRelay.accept)
             .disposed(by: searchBag)
     }
-    
-    func selectCategory(_ category: SearchResultItemType) {
-        selectedCategory = category
-    }
-    
+        
     func select(_ model: SearchResultItem) {
         didSelectRelay.accept(model)
     }

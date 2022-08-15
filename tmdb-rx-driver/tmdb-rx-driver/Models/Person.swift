@@ -12,7 +12,7 @@ struct KnownFor: Decodable {
     let title: String?
 }
 
-struct Person: Decodable {
+struct Person: Decodable, Equatable {
     let id: Int
     let name: String
     let profileUrl: String?
